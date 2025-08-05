@@ -1,0 +1,19 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Generated data
+chroma_db/
+all-MiniLM-L6-v2/
+
+# Knowledge Base documents (add your PDFs here, they won't be committed)
+knowledge_base/
+
+# React App dependencies
+InsightSphere_UI/node_modules/
+
+# IDE configuration
+.idea/
