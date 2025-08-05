@@ -1,0 +1,29 @@
+/* Import the Inter font for a cleaner, more modern UI */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary-color: #007bff;
+  /* A slightly softer background and border */
+  --background-color: #f7f8fa;
+  --border-color: #e0e0e0;
+  /* A darker, less harsh black for text */
+  --text-color: #212529;
+  --light-text-color: #fff;
+  --bot-message-bg: #e9e9eb;
+  --user-message-bg: #007bff;
+  /* Set Inter as the primary font with a system fallback */
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-weight: 400; /* Set a default normal weight */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  text-rendering: optimizeLegibility;
+}
