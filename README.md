@@ -4,6 +4,9 @@ This project is a full-stack, Retrieval-Augmented Generation (RAG) chatbot appli
 
 The application leverages a local, open-source sentence-transformer model for creating text embeddings and the high-speed Groq API for Large Language Model (LLM) inference, providing fast and contextually-aware responses.
 
+<img width="878" height="543" alt="image" src="https://github.com/user-attachments/assets/a36ac8f3-c922-45aa-96da-e59df776b5ad" />
+
+
 ## Tech Stack
 
 ### Backend
