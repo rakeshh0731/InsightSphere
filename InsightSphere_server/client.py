@@ -15,11 +15,27 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+
+class EmptyRetriever(BaseRetriever):
+    """A retriever that always returns no documents."""
+
+    def _get_relevant_documents(self, query: str, *, run_manager) -> List[Document]:
+        """Sync method, returns an empty list."""
+        return []
+
+    async def _aget_relevant_documents(
+        self, query: str, *, run_manager
+    ) -> List[Document]:
+        """Async method, returns an empty list."""
+        return []
 
 
 class Configuration:
@@ -86,17 +102,16 @@ class LangChainClient:
 
     def setup_vector_store(self, docs_path: str) -> Any:
         """
-        Sets up the ChromaDB vector store. If it already exists, it loads it.
-        If not, it creates it from the documents in the specified directory.
+        Sets up or updates the ChromaDB vector store.
+        - On first run, creates the store from documents in `docs_path`.
+        - On subsequent runs, loads the existing store and adds any new documents
+          found in `docs_path`.
+        - If no documents are found, it returns a dummy retriever.
         """
-        if os.path.exists(self.vector_store_path):
-            logging.info(f"Loading existing vector store from {self.vector_store_path}")
-            vector_store = Chroma(
-                persist_directory=self.vector_store_path,
-                embedding_function=self.embedding_function,
-            )
-        else:
-            logging.info(f"Creating new vector store from documents in: {docs_path}")
+        # Step 1: Load all current documents from the source directory.
+        all_documents = []
+        if os.path.exists(docs_path):
+            logging.info(f"Scanning for documents in '{docs_path}'...")
             # Load PDF files
             pdf_loader = DirectoryLoader(
                 docs_path,
@@ -107,7 +122,7 @@ class LangChainClient:
                 silent_errors=True,
             )
             pdf_docs = pdf_loader.load()
-            logging.info(f"Loaded {len(pdf_docs)} PDF documents.")
+            logging.info(f"Found {len(pdf_docs)} PDF documents.")
 
             # Load TXT files
             txt_loader = DirectoryLoader(
@@ -119,25 +134,61 @@ class LangChainClient:
                 silent_errors=True,
             )
             txt_docs = txt_loader.load()
-            logging.info(f"Loaded {len(txt_docs)} text documents.")
+            logging.info(f"Found {len(txt_docs)} text documents.")
+            all_documents = pdf_docs + txt_docs
+        else:
+            logging.warning(f"Knowledge base directory '{docs_path}' not found. No documents will be loaded.")
 
-            documents = pdf_docs + txt_docs
-            if not documents:
-                logging.warning("No documents found in knowledge_base. The chatbot will have no context.")
+        vector_store_exists = os.path.exists(self.vector_store_path)
 
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000, chunk_overlap=200
+        # Step 2: Handle case where vector store exists. Load it and add new docs.
+        if vector_store_exists:
+            logging.info(f"Loading existing vector store from {self.vector_store_path}")
+            vector_store = Chroma(
+                persist_directory=self.vector_store_path,
+                embedding_function=self.embedding_function,
             )
-            docs = text_splitter.split_documents(documents)
 
+            # Check for new documents to add
+            if all_documents:
+                existing_docs_metadata = vector_store.get(include=["metadatas"])
+                existing_sources = {
+                    m["source"] for m in existing_docs_metadata["metadatas"] if "source" in m
+                }
+                new_documents = [
+                    doc for doc in all_documents if doc.metadata["source"] not in existing_sources
+                ]
+
+                if new_documents:
+                    logging.info(f"Found {len(new_documents)} new document(s) to add to the vector store.")
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                    docs_to_add = text_splitter.split_documents(new_documents)
+                    vector_store.add_documents(docs_to_add)
+                    logging.info("Successfully added new documents to ChromaDB and persisted changes.")
+                else:
+                    logging.info("Vector store is already up-to-date.")
+            return vector_store.as_retriever()
+
+        # Step 3: Handle case where vector store does NOT exist.
+        else:
+            if not all_documents:
+                logging.warning(
+                    "No documents found in knowledge base. The application will start, "
+                    "but the chatbot will operate without document context. "
+                    "To add context, place PDF or TXT files in the 'knowledge_base' directory and restart."
+                )
+                return EmptyRetriever()
+
+            logging.info(f"Creating new vector store from {len(all_documents)} document(s).")
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            docs = text_splitter.split_documents(all_documents)
             vector_store = Chroma.from_documents(
                 documents=docs,
                 embedding=self.embedding_function,
                 persist_directory=self.vector_store_path,
             )
             logging.info("Vector store created and persisted.")
-
-        return vector_store.as_retriever()
+            return vector_store.as_retriever()
 
 
 class ChatSession:
