@@ -64,7 +64,7 @@ class LangChainClient:
 
         self.llm = ChatGroq(
             temperature=0,
-            model_name="llama3-70b-8192",
+            model_name="llama-3.1-8b-instant",
             api_key=self.config.groq_api_key,
             http_async_client=async_client,
         )
